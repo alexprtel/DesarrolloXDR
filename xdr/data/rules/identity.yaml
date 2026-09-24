@@ -1,0 +1,120 @@
+- id: AUTH-001
+  title: Login SSH de root
+  severity: medium
+  tactic: initial-access
+  mitre: [T1078, T1021.004]
+  category: auth
+  action: login_success
+  condition: {field: user, equals: root}
+
+- id: AUTH-002
+  title: Login de root con contraseña desde IP pública
+  severity: high
+  tactic: initial-access
+  mitre: [T1078]
+  category: auth
+  action: login_success
+  condition:
+    all:
+      - {field: user, equals: root}
+      - {field: method, equals: password}
+      - {field: src_private, is_false: true}
+
+- id: AUTH-003
+  title: Uso de sudo denegado
+  severity: medium
+  tactic: privilege-escalation
+  mitre: [T1548.003]
+  category: auth
+  action: [sudo_denied, sudo_failed]
+
+- id: AUTH-004
+  title: sudo usado para obtener shell o leer credenciales
+  severity: low
+  tactic: privilege-escalation
+  mitre: [T1548.003]
+  category: auth
+  action: sudo
+  condition:
+    field: command
+    regex: ['^(/usr)?/bin/(ba|z|da)?sh\s*$', '(/bin/)?su\s*(-|root)?\s*$', '/etc/shadow', 'visudo', 'passwd\s+root']
+
+- id: AUTH-005
+  title: Fallos repetidos de su
+  severity: medium
+  tactic: privilege-escalation
+  mitre: [T1110]
+  category: auth
+  action: su_failed
+  threshold: {count: 3, window: 120, group_by: [user]}
+
+- id: AUTH-006
+  title: Login desde IP pública
+  severity: info
+  tactic: initial-access
+  mitre: [T1078]
+  category: auth
+  action: login_success
+  condition: {field: src_private, is_false: true}
+
+- id: ACC-001
+  title: Cuenta con UID 0 (root oculto)
+  severity: critical
+  tactic: persistence
+  mitre: [T1136.001, T1078.003]
+  category: [account, auth]
+  action: [uid0_user, user_created]
+  condition:
+    any:
+      - {field: action, equals: uid0_user}
+      - {field: uid, equals: '0'}
+  response: [disable_user]
+
+- id: ACC-002
+  title: Cuenta de usuario creada
+  severity: medium
+  tactic: persistence
+  mitre: [T1136.001]
+  category: account
+  action: created
+
+- id: ACC-003
+  title: Usuario añadido a grupo privilegiado
+  severity: high
+  tactic: privilege-escalation
+  mitre: [T1098]
+  category: [account, auth]
+  action: group_member_added
+  condition: {field: group, in: [sudo, wheel, admin, root, docker, lxd, adm, shadow, disk, Administrators]}
+
+- id: ACC-004
+  title: Cuenta con contraseña vacía
+  severity: critical
+  tactic: credential-access
+  mitre: [T1078.003]
+  category: account
+  action: empty_password
+  response: [disable_user]
+
+- id: ACC-005
+  title: Cuenta de sistema con shell interactiva
+  description: Una cuenta de servicio (UID < 1000) ha pasado a tener shell de login
+  severity: high
+  tactic: persistence
+  mitre: [T1098]
+  category: account
+  action: modified
+  condition:
+    all:
+      - {field: uid, lt: 1000}
+      - {field: uid, gt: 0}
+      - {field: changes.shell, exists: true}
+      - {field: shell, regex: '/(ba|z|da|k|c|tc|fi)?sh$'}
+
+- id: ACC-006
+  title: Cuenta de usuario eliminada
+  severity: low
+  tactic: impact
+  mitre: [T1531]
+  category: account
+  action: deleted

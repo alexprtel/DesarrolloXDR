@@ -1,0 +1,98 @@
+- id: KRN-001
+  title: Módulo del kernel cargado
+  severity: high
+  tactic: persistence
+  mitre: [T1547.006]
+  category: kernel
+  action: module_loaded
+  skip_initial: true
+
+- id: KRN-002
+  title: Rootkit de kernel conocido
+  severity: critical
+  tactic: defense-evasion
+  mitre: [T1014]
+  category: kernel
+  action: module_loaded
+  condition:
+    field: module
+    regex: '^(diamorphine|reptile|reptile_module|suterusu|adore(-ng)?|kovid|nuk3gh0st|rootfoo|sutersu|enyelkm|ivyl|khook|puszek|brokepkg|singularity|lkm_?rootkit|kbeast|azazel|jynx|vlany|bdvl)$'
+  response: [isolate_host, collect_forensics]
+
+- id: KRN-003
+  title: Proceso oculto detectado (rootkit)
+  description: El PID responde a stat() pero no aparece en el listado de /proc
+  severity: critical
+  tactic: defense-evasion
+  mitre: [T1014]
+  category: kernel
+  action: hidden_process
+  response: [collect_forensics, isolate_host]
+
+- id: KRN-004
+  title: Kernel contaminado por módulo no firmado
+  severity: high
+  tactic: defense-evasion
+  mitre: [T1014, T1547.006]
+  category: kernel
+  action: tainted
+  condition: {field: unsigned_module, is_true: true}
+
+- id: DEV-001
+  title: Almacenamiento USB conectado
+  severity: low
+  tactic: exfiltration
+  mitre: [T1052, T1091]
+  category: device
+  action: usb_connected
+  condition: {field: mass_storage, is_true: true}
+
+- id: DEV-002
+  title: Dispositivo USB con teclado y almacenamiento (posible BadUSB)
+  severity: medium
+  tactic: initial-access
+  mitre: [T1200]
+  category: device
+  action: usb_connected
+  condition:
+    all:
+      - {field: hid, is_true: true}
+      - {field: interfaces, in: [mass_storage, communications, vendor_specific]}
+
+- id: DEV-003
+  title: Medio extraíble montado
+  severity: info
+  tactic: exfiltration
+  mitre: [T1052]
+  category: device
+  action: mounted
+  condition: {field: removable, is_true: true}
+
+- id: RES-001
+  title: Proceso con consumo de CPU sostenido
+  severity: low
+  tactic: impact
+  mitre: [T1496]
+  category: resource
+  action: high_cpu
+
+- id: RES-002
+  title: Criptominería detectada por consumo y red
+  severity: critical
+  tactic: impact
+  mitre: [T1496]
+  category: resource
+  action: high_cpu
+  condition:
+    any:
+      - {field: cmdline, regex: ['stratum\+', 'xmrig', '--donate-level', 'cryptonight', 'randomx']}
+      - {field: connections, regex: ':(3333|3334|5555|7777|14433|14444|45560|45700)$'}
+  response: [kill_process]
+
+- id: RES-003
+  title: Disco casi lleno
+  severity: medium
+  tactic: impact
+  mitre: [T1499]
+  category: resource
+  action: disk_full

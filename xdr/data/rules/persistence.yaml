@@ -1,0 +1,145 @@
+- id: PERS-001
+  title: Tarea programada (cron/at) creada o modificada
+  severity: medium
+  tactic: persistence
+  mitre: [T1053.003]
+  category: persistence
+  action: [created, modified]
+  condition: {field: mechanism, in: [cron, at]}
+
+- id: PERS-002
+  title: Persistencia con comando malicioso (descarga, reverse shell u ofuscación)
+  severity: critical
+  tactic: persistence
+  mitre: [T1053.003, T1543.002, T1546.004, T1105]
+  category: persistence
+  action: [created, modified, existing]
+  condition:
+    field: added_lines
+    regex:
+      - '(curl|wget)\s[^|\n]*\|\s*(ba|z|da)?sh'
+      - '/dev/tcp/'
+      - '\b(nc|ncat|netcat)\b.*\s-[a-z]*e\s'
+      - 'base64\s+(-d|--decode)'
+      - 'stratum\+tcp'
+      - '(^|\s)/(tmp|dev/shm|var/tmp)/\.\S+'
+      - 'python[23]?\s+-c\s+.*socket'
+  response: [quarantine_file]
+
+- id: PERS-003
+  title: Servicio o timer systemd creado
+  severity: medium
+  tactic: persistence
+  mitre: [T1543.002]
+  category: persistence
+  action: [created]
+  condition: {field: mechanism, equals: systemd}
+
+- id: PERS-004
+  title: Claves SSH autorizadas modificadas
+  severity: high
+  tactic: persistence
+  mitre: [T1098.004]
+  category: persistence
+  action: [created, modified]
+  condition: {field: path, regex: 'authorized_keys2?$'}
+
+- id: PERS-005
+  title: /etc/ld.so.preload en uso (rootkit de usuario)
+  severity: critical
+  tactic: defense-evasion
+  mitre: [T1574.006, T1014]
+  category: persistence
+  action: [created, modified, existing]
+  condition:
+    all:
+      - {field: path, equals: /etc/ld.so.preload}
+      - {field: content, regex: '\S'}
+  response: [quarantine_file]
+
+- id: PERS-006
+  title: Perfil de shell modificado
+  severity: medium
+  tactic: persistence
+  mitre: [T1546.004]
+  category: persistence
+  action: [created, modified]
+  condition: {field: mechanism, equals: shell_profile}
+
+- id: PERS-007
+  title: Configuración sudoers modificada
+  severity: high
+  tactic: privilege-escalation
+  mitre: [T1548.003]
+  category: persistence
+  action: [created, modified]
+  condition: {field: mechanism, equals: sudoers}
+
+- id: PERS-008
+  title: Configuración PAM modificada (posible backdoor de autenticación)
+  severity: high
+  tactic: credential-access
+  mitre: [T1556.003]
+  category: persistence
+  action: [created, modified]
+  condition: {field: mechanism, equals: pam}
+
+- id: PERS-009
+  title: Script de arranque (init / rc.local / motd) modificado
+  severity: medium
+  tactic: persistence
+  mitre: [T1037]
+  category: persistence
+  action: [created, modified]
+  condition: {field: mechanism, in: [init, motd, x11, autostart, udev]}
+
+- id: PERS-010
+  title: Hook de gestor de paquetes creado
+  severity: high
+  tactic: persistence
+  mitre: [T1546]
+  category: persistence
+  action: [created, modified]
+  condition:
+    all:
+      - {field: mechanism, equals: package_hook}
+      - {field: added_lines, regex: '(Pre|Post)-Invoke|DPkg::|APT::Update'}
+
+- id: PERS-011
+  title: Configuración de carga de módulos del kernel modificada
+  severity: high
+  tactic: persistence
+  mitre: [T1547.006]
+  category: persistence
+  action: [created, modified]
+  condition: {field: mechanism, equals: kernel_module}
+
+- id: PERS-012
+  title: Configuración de SSH debilitada
+  severity: high
+  tactic: persistence
+  mitre: [T1098]
+  category: persistence
+  action: [created, modified]
+  condition:
+    all:
+      - {field: mechanism, equals: ssh}
+      - {field: added_lines, regex: '(?m)^\s*(PermitRootLogin\s+yes|PermitEmptyPasswords\s+yes|PasswordAuthentication\s+yes|AuthorizedKeysFile\s+\S+)'}
+
+- id: PERS-013
+  title: Fichero hosts modificado (posible redirección DNS)
+  severity: medium
+  tactic: defense-evasion
+  mitre: [T1565.001]
+  category: persistence
+  action: [modified]
+  condition: {field: mechanism, equals: hosts}
+
+- id: PERS-014
+  title: Clave Run / carpeta de inicio / tarea programada de Windows creada
+  severity: medium
+  tactic: persistence
+  mitre: [T1547.001]
+  category: persistence
+  action: [created, modified]
+  condition: {field: mechanism, in: [registry_run, startup_folder, scheduled_task]}

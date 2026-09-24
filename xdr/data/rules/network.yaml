@@ -1,0 +1,100 @@
+- id: NET-001
+  title: Conexión saliente a puerto típico de backdoor/C2
+  severity: medium
+  tactic: command-and-control
+  mitre: [T1571]
+  category: network
+  action: connection
+  condition:
+    all:
+      - {field: direction, equals: outbound}
+      - {field: remote_private, is_false: true}
+      - {field: remote_port, in: [4444, 4445, 1337, 31337, 6666, 6667, 6668, 6669, 12345, 54321, 9999, 1234, 5554, 8888, 2222]}
+  response: [kill_process, block_ip]
+
+- id: NET-002
+  title: Conexión a pool de minería (puerto stratum)
+  severity: high
+  tactic: impact
+  mitre: [T1496]
+  category: network
+  action: connection
+  condition:
+    all:
+      - {field: direction, equals: outbound}
+      - {field: remote_port, in: [3333, 3334, 3335, 5555, 7777, 14433, 14444, 45560, 45700, 10128, 10343, 20580]}
+  response: [kill_process, block_ip]
+
+- id: NET-003
+  title: Nuevo servicio expuesto a la red
+  description: Un proceso ha abierto un puerto a la escucha en una interfaz no local
+  severity: low
+  tactic: persistence
+  mitre: [T1571]
+  category: network
+  action: listen
+  skip_initial: true
+  condition:
+    all:
+      - {field: exposed, is_true: true}
+      - {field: proto, in: [tcp, tcp6]}
+
+- id: NET-004
+  title: Bind shell - intérprete a la escucha
+  severity: critical
+  tactic: execution
+  mitre: [T1059.004, T1571]
+  category: network
+  action: listen
+  condition:
+    field: process
+    in: [sh, bash, dash, zsh, nc, ncat, netcat, nc.traditional, nc.openbsd, socat, perl, php, ruby, cmd.exe, powershell.exe]
+  response: [kill_process]
+
+- id: NET-005
+  title: Interfaz de red en modo promiscuo (sniffing)
+  severity: medium
+  tactic: credential-access
+  mitre: [T1040]
+  category: network
+  action: promiscuous
+
+- id: NET-006
+  title: Shell o utilidad de red con conexión saliente directa
+  description: Intérprete de comandos conectado directamente a una IP pública (posible reverse shell)
+  severity: high
+  tactic: command-and-control
+  mitre: [T1059.004, T1095]
+  category: network
+  action: connection
+  condition:
+    all:
+      - {field: direction, equals: outbound}
+      - {field: remote_private, is_false: true}
+      - {field: process, in: [sh, bash, dash, zsh, ksh, nc, ncat, netcat, nc.traditional, nc.openbsd, socat, telnet, cmd.exe, powershell.exe]}
+  response: [kill_process, block_ip]
+
+- id: NET-007
+  title: Conexión a la red Tor
+  severity: medium
+  tactic: command-and-control
+  mitre: [T1090]
+  category: network
+  action: connection
+  condition:
+    any:
+      - {field: remote_port, in: [9001, 9030, 9050, 9051, 9150]}
+      - {field: process, in: [tor, tor.exe]}
+
+- id: NET-008
+  title: SMTP saliente desde proceso no de correo
+  severity: low
+  tactic: exfiltration
+  mitre: [T1048]
+  category: network
+  action: connection
+  condition:
+    all:
+      - {field: direction, equals: outbound}
+      - {field: remote_port, in: [25, 465, 587]}
+      - {field: process, not_in: [postfix, smtp, master, exim, exim4, sendmail, thunderbird, evolution, outlook.exe, msmtp, ssmtp, nullmailer-send]}

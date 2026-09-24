@@ -1,0 +1,104 @@
+- id: FILE-001
+  title: Fichero de script web creado/modificado (posible webshell)
+  severity: medium
+  tactic: persistence
+  mitre: [T1505.003]
+  category: file
+  action: [create, modify, rename]
+  condition:
+    all:
+      - {field: path, regex: '^/(var/www|srv/www|srv/http|usr/share/nginx|var/lib/tomcat\d*/webapps|opt/lampp/htdocs)/'}
+      - {field: extension, in: [.php, .php5, .php7, .phtml, .phar, .jsp, .jspx, .asp, .aspx, .ashx, .cgi, .pl]}
+
+- id: FILE-002
+  title: Nuevo binario SUID/SGID
+  severity: high
+  tactic: privilege-escalation
+  mitre: [T1548.001]
+  category: file
+  action: [create, attrib, rename]
+  condition:
+    any:
+      - {field: became_setuid, is_true: true}
+      - all:
+          - {field: setuid, is_true: true}
+          - {field: action, in: [create, rename]}
+
+- id: FILE-003
+  title: Binario del sistema modificado
+  description: Cambio en un ejecutable del sistema. Verifique si corresponde a una actualización de paquetes.
+  severity: medium
+  tactic: defense-evasion
+  mitre: [T1036, T1014]
+  category: file
+  action: [modify, create]
+  condition:
+    all:
+      - {field: zone, equals: system}
+      - {field: path, regex: '^/(usr/)?(s?bin|lib(64)?/security)/'}
+
+- id: FILE-004
+  title: Ejecutable depositado en zona temporal
+  severity: medium
+  tactic: execution
+  mitre: [T1105]
+  category: file
+  action: [create, existing, rename]
+  condition:
+    all:
+      - {field: zone, equals: staging}
+      - {field: path, regex: '^/(tmp|var/tmp|dev/shm)/'}
+      - any:
+          - {field: is_elf, is_true: true}
+          - {field: extension, in: [.exe, .dll, .scr, .ps1, .vbs, .hta, .bat]}
+
+- id: FILE-005
+  title: Ejecutable oculto en zona temporal
+  severity: high
+  tactic: defense-evasion
+  mitre: [T1564.001, T1105]
+  category: file
+  action: [create, existing, rename]
+  condition:
+    all:
+      - {field: path, regex: '^/(tmp|var/tmp|dev/shm)/(.*/)?\.[^/]+'}
+      - any:
+          - {field: is_elf, is_true: true}
+          - all:
+              - {field: is_script, is_true: true}
+              - {field: executable, is_true: true}
+  response: [quarantine_file]
+
+- id: FILE-006
+  title: Fichero canario manipulado (ransomware)
+  description: Un fichero señuelo desplegado por el XDR ha sido modificado o borrado
+  severity: critical
+  tactic: impact
+  mitre: [T1486]
+  category: file
+  action: canary_tampered
+  response: [kill_top_writer, isolate_host, collect_forensics]
+
+- id: FILE-007
+  title: Fichero escribible por cualquiera en ruta del sistema
+  severity: medium
+  tactic: defense-evasion
+  mitre: [T1222.002]
+  category: file
+  action: [create, attrib]
+  condition:
+    all:
+      - {field: zone, equals: system}
+      - {field: world_writable, is_true: true}
+
+- id: FILE-008
+  title: Descarga de fichero con firma de ejecutable de Windows en Linux
+  severity: low
+  tactic: execution
+  mitre: [T1105]
+  category: file
+  action: [create]
+  condition:
+    all:
+      - {field: zone, in: [staging, user]}
+      - {field: extension, in: [.exe, .scr, .dll, .lnk, .hta, .js, .vbs, .iso, .img]}

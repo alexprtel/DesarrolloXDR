@@ -1,0 +1,160 @@
+# Firmas de contenido (estilo YARA simplificado).
+# strings: literales (nocase por defecto) · regex: expresiones sobre bytes
+# condition: any | all | <número mínimo de coincidencias>
+- id: SIG-EICAR
+  name: EICAR-Test-File
+  severity: high
+  description: Fichero de prueba estándar antimalware
+  mitre: [T1204]
+  strings: ['X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*']
+  response: [quarantine_file]
+
+- id: SIG-WEBSHELL-PHP
+  name: Webshell PHP
+  severity: critical
+  tactic: persistence
+  mitre: [T1505.003]
+  regex:
+    - 'eval\s*\(\s*(base64_decode|gzinflate|gzuncompress|str_rot13|strrev)\s*\('
+    - '(system|exec|shell_exec|passthru|popen|proc_open|assert|eval)\s*\(\s*\$_(GET|POST|REQUEST|COOKIE|SERVER)'
+    - 'preg_replace\s*\(\s*[''"]/.+/e[''"]'
+    - '\$_(GET|POST|REQUEST)\s*\[[^\]]+\]\s*\(\s*\$_(GET|POST|REQUEST)'
+  strings: ['c99shell', 'r57shell', 'b374k', 'FilesMan', 'WSO 2.', 'Weevely', 'p0wny@shell', 'IndoXploit']
+  condition: any
+  response: [quarantine_file]
+
+- id: SIG-WEBSHELL-JSP-ASPX
+  name: Webshell JSP/ASPX
+  severity: critical
+  tactic: persistence
+  mitre: [T1505.003]
+  regex:
+    - 'Runtime\.getRuntime\(\)\.exec\(\s*request\.getParameter'
+    - 'ProcessBuilder\(.*request\.getParameter'
+    - '<%@\s*Page\s+Language\s*=\s*"?Jscript"?\s*%>\s*<%\s*eval\s*\(\s*Request'
+    - 'Process\.Start\(.*Request\.(Form|QueryString)'
+  strings: ['AntSword', 'Behinder', 'Godzilla', 'chopper']
+  condition: any
+  response: [quarantine_file]
+
+- id: SIG-REVSHELL-SCRIPT
+  name: Script de reverse shell
+  severity: high
+  tactic: execution
+  mitre: [T1059.004]
+  regex:
+    - '(ba)?sh\s+-i\s*>&\s*/dev/tcp/'
+    - '/dev/tcp/\d{1,3}(\.\d{1,3}){3}/\d+'
+    - 'socket\.socket\(.*\)[\s\S]{0,400}os\.dup2\('
+    - 'fsockopen\(\s*[''"][\d.]+[''"]\s*,\s*\d+\s*\)[\s\S]{0,200}(exec|proc_open|shell_exec)'
+    - 'nc(at)?\s+(-e|-c)\s+/bin/(ba)?sh'
+    - 'mkfifo\s+/tmp/\S+\s*;\s*nc\s'
+  condition: any
+  response: [quarantine_file]
+
+- id: SIG-MINER
+  name: Criptominero (XMRig y derivados)
+  severity: critical
+  tactic: impact
+  mitre: [T1496]
+  strings: ['stratum+tcp://', 'stratum+ssl://', 'xmrig', '"donate-level"', '--donate-level', 'cryptonight', 'randomx', 'nicehash', 'minexmr', 'supportxmr', 'moneroocean']
+  condition: 3
+  response: [quarantine_file]
+
+- id: SIG-MIMIKATZ
+  name: Mimikatz / volcado de credenciales
+  severity: critical
+  tactic: credential-access
+  mitre: [T1003]
+  strings: ['sekurlsa::logonpasswords', 'gentilkiwi', 'mimikatz', 'lsadump::sam', 'kerberos::golden', 'privilege::debug']
+  condition: 2
+  response: [quarantine_file]
+
+- id: SIG-RANSOM-NOTE
+  name: Nota de rescate de ransomware
+  severity: critical
+  tactic: impact
+  mitre: [T1486]
+  regex:
+    - 'your (important )?files (have been|are|were) (encrypted|locked)'
+    - '(decrypt|recover|restore)[\s\S]{0,200}(bitcoin|btc|monero|xmr|\.onion|tox id)'
+    - 'all your (data|files|documents)[\s\S]{0,100}(encrypted|stolen)'
+    - 'tus archivos (han sido|fueron) (cifrados|encriptados)'
+  condition: any
+  filetypes: [text]
+  response: [collect_forensics]
+
+- id: SIG-LINUX-ROOTKIT
+  name: Rootkit Linux conocido
+  severity: critical
+  tactic: defense-evasion
+  mitre: [T1014]
+  strings: ['diamorphine', 'reptile_shell', 'reptile_module', 'suterusu', 'hide_tcp4_port', 'libprocesshider', 'azazel', 'jynx2', 'bdvl', 'LD_PRELOAD rootkit']
+  condition: any
+  filetypes: [elf, script, text]
+  response: [quarantine_file]
+
+- id: SIG-MIRAI
+  name: Botnet IoT (Mirai / Gafgyt)
+  severity: critical
+  tactic: command-and-control
+  mitre: [T1071]
+  strings: ['/bin/busybox MIRAI', 'MIRAI', 'Gafgyt', 'BOTKILL', 'LOLNOGTFO', '/bin/busybox ECCHI', 'UDPRAW', 'HTTPFLOOD']
+  condition: 2
+  response: [quarantine_file]
+
+- id: SIG-COBALTSTRIKE
+  name: Beacon de Cobalt Strike / Meterpreter
+  severity: critical
+  tactic: command-and-control
+  mitre: [T1071, T1055]
+  strings: ['ReflectiveLoader', 'beacon.dll', 'beacon.x64.dll', '%s as %s\%s: %d', 'meterpreter', 'metsrv', 'stdapi_sys_process']
+  condition: 2
+  response: [quarantine_file]
+
+- id: SIG-POWERSHELL-DOWNLOADER
+  name: Descargador PowerShell ofuscado
+  severity: high
+  tactic: execution
+  mitre: [T1059.001, T1027]
+  regex:
+    - 'IEX\s*\(\s*New-Object\s+Net\.WebClient\s*\)\.DownloadString'
+    - 'powershell(\.exe)?\s+.*-(e|enc|encodedcommand)\s+[A-Za-z0-9+/=]{40,}'
+    - '\[System\.Convert\]::FromBase64String'
+    - 'Invoke-(Mimikatz|Shellcode|ReflectivePEInjection)'
+  condition: any
+  response: [quarantine_file]
+
+- id: SIG-SH-DROPPER
+  name: Dropper de shell (descarga + ejecución + persistencia)
+  severity: high
+  tactic: execution
+  mitre: [T1105, T1053.003]
+  regex:
+    - '(curl|wget)\s[^\n|]*\|\s*(ba)?sh'
+    - '(curl|wget)\s[^\n]*-O\s*/(tmp|dev/shm|var/tmp)/[^\n]*\n[^\n]*chmod\s+\+?[0-7]*x'
+    - 'crontab\s+-l[^\n]*\|[^\n]*(curl|wget)'
+    - 'chattr\s+\+i\s+/(etc|usr|tmp)'
+    - 'pkill\s+-9\s+.*(xmrig|kinsing|kdevtmpfsi|minerd)'
+  condition: 2
+  filetypes: [script, text]
+  response: [quarantine_file]
+
+- id: SIG-BROWSER-STEALER
+  name: Ladrón de credenciales de navegador
+  severity: high
+  tactic: credential-access
+  mitre: [T1555.003]
+  strings: ['Login Data', 'Local State', 'cookies.sqlite', 'logins.json', 'key4.db', 'encrypted_key', 'wallet.dat']
+  condition: 4
+  response: [quarantine_file]
+
+- id: SIG-UPX
+  name: Ejecutable empaquetado con UPX
+  severity: low
+  tactic: defense-evasion
+  mitre: [T1027.002]
+  strings: ['UPX!']
+  nocase: false
+  filetypes: [elf, pe]
+  response: []

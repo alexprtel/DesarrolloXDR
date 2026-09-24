@@ -1,0 +1,44 @@
+{
+  "sha256": {
+    "275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f": "EICAR test file",
+    "131f95c51cc819465fa1797f6ccacf9d494aaaff46fa3eac73ae63ffbdfd8267": "EICAR test file (con salto de línea)"
+  },
+  "md5": {
+    "44d88612fea8a8f36de82e1278abb02f": "EICAR test file"
+  },
+  "ips": {
+    "198.51.100.66": "Ejemplo C2 de laboratorio (TEST-NET-2)",
+    "203.0.113.66": "Ejemplo C2 de laboratorio (TEST-NET-3)"
+  },
+  "cidrs": {},
+  "domains": {
+    "malware.testing.google.test": "Dominio de prueba de malware",
+    "supportxmr.com": "Pool de minería Monero",
+    "minexmr.com": "Pool de minería Monero",
+    "moneroocean.stream": "Pool de minería Monero",
+    "nanopool.org": "Pool de minería",
+    "c3pool.com": "Pool de minería Monero",
+    "2miners.com": "Pool de minería",
+    "f2pool.com": "Pool de minería",
+    "hashvault.pro": "Pool de minería Monero",
+    "xmrpool.eu": "Pool de minería Monero",
+    "herominers.com": "Pool de minería",
+    "unmineable.com": "Pool de minería",
+    "transfer.sh": "Servicio de subida anónima usado en exfiltración",
+    "pastebin.com": "Paste público (staging de payloads)",
+    "ngrok.io": "Túnel inverso",
+    "ngrok-free.app": "Túnel inverso",
+    "trycloudflare.com": "Túnel inverso de Cloudflare",
+    "interact.sh": "OAST / exfiltración fuera de banda",
+    "oast.fun": "OAST / exfiltración fuera de banda",
+    "burpcollaborator.net": "OAST / exfiltración fuera de banda"
+  },
+  "filenames": {
+    "xmrig": "Criptominero",
+    "kdevtmpfsi": "Kinsing miner",
+    "kinsing": "Kinsing malware",
+    "mimikatz.exe": "Volcado de credenciales",
+    "linpeas.sh": "Enumeración de escalada de privilegios",
+    "pspy64": "Monitor de procesos ofensivo"
+  }
+}

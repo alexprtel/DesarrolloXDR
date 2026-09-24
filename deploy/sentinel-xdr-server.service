@@ -1,0 +1,19 @@
+[Unit]
+Description=SentinelXDR central server (API + consola)
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/sentinel-xdr -c /etc/sentinel-xdr/xdr.yaml --log-file /var/log/sentinel-xdr/server.log server
+Restart=always
+RestartSec=5
+DynamicUser=yes
+StateDirectory=sentinel-xdr
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+LogsDirectory=sentinel-xdr
+
+[Install]
+WantedBy=multi-user.target

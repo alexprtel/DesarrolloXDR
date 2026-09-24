@@ -1,0 +1,57 @@
+# Ejemplo de configuración de SentinelXDR. Genere la suya con: sentinel-xdr init
+# Todas las claves son opcionales; los valores por defecto están en xdr/config.py
+
+agent:
+  server_url: null               # https://xdr.midominio:8443  (null en modo 'run')
+  enroll_key: CAMBIAR            # debe coincidir con server.enroll_key
+  data_dir: /var/lib/sentinel-xdr
+  verify_tls: true
+  ca_file: null                  # CA propia si el servidor usa certificado autofirmado
+
+server:
+  host: 127.0.0.1                # 0.0.0.0 para aceptar agentes remotos (use TLS)
+  port: 8443
+  admin_token: CAMBIAR           # token de la consola web / API
+  enroll_key: CAMBIAR
+  tls_cert: null                 # /etc/sentinel-xdr/server.crt
+  tls_key: null
+  retention_days: 30
+
+collectors:
+  process:     {enabled: true, interval: 2, realtime: true}
+  network:     {enabled: true, interval: 3}
+  fim:         {enabled: true, interval: 30}
+  malware_scan: {enabled: true, paths: [/tmp, /var/tmp, /dev/shm, /home/*/Downloads, /var/www]}
+  ransomware:  {enabled: true, paths: [/home, /root, /srv], canaries: true}
+  auth:        {enabled: true, files: [/var/log/auth.log, /var/log/secure]}
+  persistence: {enabled: true, interval: 20}
+  accounts:    {enabled: true}
+  kernel:      {enabled: true}
+  devices:     {enabled: true}
+  resources:   {enabled: true, cpu_threshold: 85}
+  posture:     {enabled: true, interval: 3600}
+
+detection:
+  learning_period: 3600          # segundos de aprendizaje de la línea base (UEBA)
+  extra_rules_dirs: []           # directorios con reglas YAML propias (se suman a las incluidas)
+  bruteforce: {threshold: 5, window: 120}
+  ransomware: {threshold: 25, window: 30, entropy: 7.2}
+  allowlist:
+    processes: []                # nombres o rutas de ejecutables de confianza
+    ips: [127.0.0.1, "::1"]      # redes excluidas de alertas de comportamiento
+    paths: []
+
+response:
+  enabled: true
+  min_severity: high             # respuesta automática desde esta severidad
+  dry_run: false                 # true = solo registrar qué se haría
+  auto_isolate: false            # aislamiento de red automático (disruptivo)
+  protected_processes: [systemd, init, sshd, dockerd, containerd]
+  protected_paths: []            # rutas extra que la respuesta nunca mueve ni borra
+                                 # (/usr, /bin, /lib, /etc/passwd, PAM... ya están protegidas)
+  never_block_ips: [127.0.0.1, "::1", 10.0.0.1]
+
+integrations:
+  webhook_url: null              # Slack / Teams / webhook genérico
+  webhook_min_severity: high
+  syslog: null                   # "siem.local:514" -> reenvío CEF por UDP

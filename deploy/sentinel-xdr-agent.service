@@ -1,0 +1,18 @@
+[Unit]
+Description=SentinelXDR endpoint agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/sentinel-xdr -c /etc/sentinel-xdr/xdr.yaml --log-file /var/log/sentinel-xdr/agent.log agent
+Restart=always
+RestartSec=5
+# El agente necesita root para visibilidad completa (/proc, netlink, iptables)
+User=root
+Nice=5
+CPUQuota=25%
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target

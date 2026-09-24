@@ -1,0 +1,446 @@
+# Reglas de ejecución de procesos (Linux / Windows)
+- id: PROC-001
+  title: Reverse shell detectada
+  description: Línea de comandos típica de shell inversa (bash /dev/tcp, nc -e, socat, python pty...)
+  severity: critical
+  tactic: execution
+  mitre: [T1059.004, T1071]
+  category: process
+  action: start
+  condition:
+    field: cmdline
+    regex:
+      - '(ba|z|k)?sh\s+-i\s*[>&]+\s*/dev/(tcp|udp)/'
+      - '/dev/tcp/\d{1,3}(\.\d{1,3}){3}/\d+'
+      - '\b(nc|ncat|netcat|nc\.traditional|nc\.openbsd)\b.*\s-[a-z]*[ec]\s+\S*(sh|bash|cmd)'
+      - '\bsocat\b.*exec:.*(sh|bash)'
+      - '\bsocat\b.*tcp(4|6)?:\d.*(pty|stderr)'
+      - 'mkfifo\s+\S+.*\|\s*(/bin/)?(ba)?sh\s+-i.*\|\s*(nc|ncat|openssl)'
+      - 'socket\.socket\(.*connect\(.*(dup2|pty\.spawn|subprocess)'
+      - 'perl\s+-e\s+.*socket\(.*exec'
+      - 'php\s+-r\s+.*fsockopen\('
+      - 'ruby\s+-rsocket\s+-e'
+      - 'openssl\s+s_client\s+.*-connect.*\|\s*(/bin/)?(ba)?sh'
+  response: [kill_process, block_ip]
+
+- id: PROC-002
+  title: Descarga y ejecución directa (curl/wget | sh)
+  description: Se descarga contenido remoto y se canaliza directamente a un intérprete
+  severity: high
+  tactic: execution
+  mitre: [T1105, T1059.004]
+  category: process
+  action: start
+  condition:
+    field: cmdline
+    regex:
+      - '(curl|wget|fetch)\s[^|;]*\|\s*(sudo\s+)?(ba|z|da)?sh\b'
+      - '(curl|wget)\s[^|;]*\|\s*(python[23]?|perl|ruby|php)\b'
+      - 'wget\s.*-O\s*-\s*\|'
+      - '(curl|wget)\s.*(-o|-O)\s*/(tmp|dev/shm|var/tmp)/\S+\s*(;|&&)\s*(chmod\s+\+?[0-7]*x|sh|bash|\./)'
+  response: [kill_process]
+
+- id: PROC-003
+  title: Ejecución de binario desde directorio temporal
+  description: Binario ejecutado desde /tmp, /dev/shm o /var/tmp (staging típico de malware)
+  severity: medium
+  tactic: execution
+  mitre: [T1204]
+  category: process
+  action: start
+  condition:
+    field: exe
+    startswith: [/tmp/, /dev/shm/, /var/tmp/, /run/shm/]
+
+- id: PROC-004
+  title: Ejecución desde directorio oculto en zona temporal
+  description: Binario en ruta oculta de /tmp o /dev/shm, técnica frecuente en malware Linux
+  severity: high
+  tactic: defense-evasion
+  mitre: [T1564.001, T1204]
+  category: process
+  action: start
+  condition:
+    field: exe
+    regex: '^/(tmp|dev/shm|var/tmp)/(.*/)?\.[^/]+'
+  response: [kill_process, quarantine_file]
+
+- id: PROC-005
+  title: Proceso cuyo binario ya no existe en disco
+  description: Puede deberse a una actualización de paquetes, pero también a malware que se borra tras ejecutarse
+  severity: medium
+  tactic: defense-evasion
+  mitre: [T1070.004]
+  category: process
+  action: start
+  condition:
+    all:
+      - {field: exe_deleted, is_true: true}
+      - {field: memfd, is_false: true}
+
+- id: PROC-005B
+  title: Ejecución fileless desde memoria o desde temporal borrado
+  description: Proceso ejecutado desde memfd o desde un binario borrado en /tmp, /dev/shm o /var/tmp
+  severity: high
+  tactic: defense-evasion
+  mitre: [T1620, T1070.004]
+  category: process
+  action: start
+  skip_initial: true
+  condition:
+    all:
+      - any:
+          - {field: memfd, is_true: true}
+          - all:
+              - {field: exe_deleted, is_true: true}
+              - {field: exe, regex: '^/(tmp|dev/shm|var/tmp|run/user)/'}
+      - {field: exe, not_regex: 'runc|containerd|docker|crun|conmon'}
+      - {field: name, not_in: [runc, crun, containerd-shim, conmon, 'runc:[1:CHILD]', 'runc:[2:INIT]']}
+  response: [kill_process]
+
+- id: PROC-006
+  title: Proceso con LD_PRELOAD sospechoso
+  description: Inyección de librería mediante LD_PRELOAD (hooking / rootkit de usuario)
+  severity: high
+  tactic: defense-evasion
+  mitre: [T1574.006]
+  category: process
+  action: start
+  condition:
+    all:
+      - {field: ld_preload, exists: true}
+      - {field: ld_preload, not_contains: [libfakeroot, nocsd, libeatmydata, libasan, libjemalloc, libtcmalloc, vgpreload]}
+
+- id: PROC-007
+  title: Servidor web ha lanzado una shell (posible webshell / RCE)
+  severity: high
+  tactic: initial-access
+  mitre: [T1505.003, T1190]
+  category: process
+  action: start
+  condition:
+    all:
+      - field: parent.name
+        regex: '^(nginx|apache2?|httpd|lighttpd|php-fpm.*|php-cgi|caddy|tomcat.*|catalina.*|w3wp\.exe|iisexpress\.exe|uwsgi|gunicorn)$'
+      - field: name
+        in: [sh, bash, dash, zsh, ksh, nc, ncat, netcat, python, python3, perl, curl, wget, whoami, id, uname, cmd.exe, powershell.exe]
+  response: [kill_process]
+
+- id: PROC-008
+  title: Volcado o robo de credenciales
+  description: Acceso a hashes de contraseñas o herramientas de extracción de credenciales
+  severity: high
+  tactic: credential-access
+  mitre: [T1003, T1003.008]
+  category: process
+  action: start
+  condition:
+    any:
+      - field: cmdline
+        regex:
+          - '\b(cat|cp|tar|zip|less|more|head|tail|base64|xxd|scp|curl|nc)\b.*/etc/(g)?shadow'
+          - '\bunshadow\b'
+          - '\b(john|hashcat)\b'
+          - '(mimikatz|sekurlsa|lazagne|mimipenguin|pypykatz)'
+          - 'procdump.*lsass'
+          - 'comsvcs(\.dll)?,?\s*minidump'
+          - 'reg(\.exe)?\s+save\s+hklm\\(sam|system|security)'
+      - field: name
+        in: [mimikatz.exe, lazagne, lazagne.exe, mimipenguin, pypykatz]
+  response: [kill_process]
+
+- id: PROC-009
+  title: Criptominero en ejecución
+  severity: critical
+  tactic: impact
+  mitre: [T1496]
+  category: process
+  action: start
+  condition:
+    any:
+      - field: name
+        in: [xmrig, xmr-stak, xmr-stak-cpu, minerd, cpuminer, cpuminer-multi, ethminer, nbminer, t-rex, lolminer, cgminer, bfgminer, kdevtmpfsi, kinsing, xmrig.exe, nanominer, phoenixminer, teamredminer]
+      - field: cmdline
+        regex:
+          - 'stratum\+(tcp|ssl|tls)://'
+          - '--donate-level'
+          - '\s-a\s+(cryptonight|rx/0|randomx|ethash|kawpow)'
+          - '--(coin|algo)[= ](monero|xmr|rx/0|randomx)'
+  response: [kill_process, quarantine_file]
+
+- id: PROC-010
+  title: Borrado de rastros (logs / historial)
+  severity: high
+  tactic: defense-evasion
+  mitre: [T1070.002, T1070.003]
+  category: process
+  action: start
+  condition:
+    field: cmdline
+    regex:
+      - '\b(rm|shred|truncate|unlink)\b.*(/var/log/|\.bash_history|\.zsh_history|wtmp|btmp|lastlog|/var/log/audit)'
+      - 'history\s+-c'
+      - 'unset\s+HISTFILE'
+      - 'HISTFILE=/dev/null'
+      - 'HISTSIZE=0'
+      - 'ln\s+-sf?\s+/dev/null\s+\S*history'
+      - 'journalctl\s+.*--vacuum'
+      - 'wevtutil(\.exe)?\s+cl\b'
+      - 'Clear-EventLog'
+  response: [collect_forensics]
+
+- id: PROC-011
+  title: Desactivación de herramientas de seguridad o cortafuegos
+  severity: high
+  tactic: defense-evasion
+  mitre: [T1562.001, T1562.004]
+  category: process
+  action: start
+  condition:
+    field: cmdline
+    regex:
+      - 'systemctl\s+(stop|disable|mask|kill)\s+.*(auditd|apparmor|firewalld|ufw|falco|osquery|sentinel-xdr|clamav|wazuh|crowdstrike|falcon|sysmon|selinux|fail2ban)'
+      - 'service\s+(auditd|apparmor|firewalld|ufw|fail2ban)\s+stop'
+      - 'setenforce\s+0'
+      - 'iptables\s+(-F|--flush)(\s|$)'
+      - 'iptables\s+-P\s+INPUT\s+ACCEPT'
+      - 'nft\s+flush\s+ruleset'
+      - 'ufw\s+disable'
+      - 'auditctl\s+-D'
+      - 'Set-MpPreference\s+.*-Disable(RealtimeMonitoring|IOAV|BehaviorMonitoring)'
+      - 'netsh\s+(adv)?firewall\s+set\s+.*state\s+off'
+  response: [collect_forensics]
+
+- id: PROC-012
+  title: Ráfaga de comandos de reconocimiento
+  description: Múltiples comandos de descubrimiento lanzados por el mismo proceso padre
+  severity: low
+  tactic: discovery
+  mitre: [T1082, T1087, T1057]
+  category: process
+  action: start
+  skip_initial: true
+  condition:
+    field: name
+    in: [whoami, id, uname, hostname, ifconfig, ip, netstat, ss, ps, w, who, last, lsb_release, getent, groups, route, arp, lscpu, env, crontab, sudo]
+  threshold: {count: 6, window: 60, group_by: [parent.pid]}
+
+- id: PROC-013
+  title: Herramienta ofensiva / de escaneo ejecutada
+  severity: medium
+  tactic: discovery
+  mitre: [T1046, T1595]
+  category: process
+  action: start
+  condition:
+    any:
+      - field: name
+        in: [nmap, masscan, zmap, rustscan, hydra, medusa, ncrack, nikto, sqlmap, gobuster, dirb, feroxbuster, wfuzz, crackmapexec, nxc, netexec, responder, enum4linux, kerbrute, bettercap, ettercap, arpspoof, tcpdump]
+      - field: cmdline
+        regex: ['(linpeas|linenum|lse\.sh|les\.sh|linux-exploit-suggester|pspy|unix-privesc-check|winpeas|sharphound|bloodhound|rubeus|seatbelt)']
+
+- id: PROC-014
+  title: Herramienta de túnel / proxy inverso
+  severity: high
+  tactic: command-and-control
+  mitre: [T1572, T1090]
+  category: process
+  action: start
+  condition:
+    any:
+      - field: name
+        in: [chisel, ligolo, ligolo-ng, frpc, frps, ngrok, gost, iodine, dnscat2, ptunnel, revsocks, rpivot, bore, cloudflared]
+      - field: cmdline
+        regex: ['\bssh\b.*\s-[a-zA-Z]*R\s*\d+:', '\bchisel\b.*\bclient\b', 'ngrok\s+(tcp|http)']
+  response: [kill_process]
+
+- id: PROC-015
+  title: Ejecución de contenido ofuscado (base64 / codificado)
+  severity: high
+  tactic: defense-evasion
+  mitre: [T1140, T1027, T1059]
+  category: process
+  action: start
+  condition:
+    field: cmdline
+    regex:
+      - 'base64\s+(-d|--decode|-D).*\|\s*(sudo\s+)?(ba|z|da)?sh'
+      - 'echo\s+[A-Za-z0-9+/=]{40,}\s*\|\s*base64'
+      - 'python[23]?\s+-c\s+.*(exec|eval)\(.*(b64decode|decode\(.base64|zlib\.decompress)'
+      - 'perl\s+-e\s+.*(decode_base64|unpack)'
+      - 'powershell(\.exe)?\s+.*-e(nc|ncodedcommand)?\s+[A-Za-z0-9+/=]{20,}'
+      - 'FromBase64String'
+      - 'IEX\s*\(?\s*\(?New-Object\s+Net\.WebClient\)?\.Download(String|File)'
+  response: [kill_process]
+
+- id: PROC-016
+  title: Proceso que suplanta un hilo del kernel
+  description: Nombre de proceso de kernel (kworker, kthreadd...) con binario en disco; típico de mineros y backdoors
+  severity: high
+  tactic: defense-evasion
+  mitre: [T1036.005]
+  category: process
+  action: start
+  condition:
+    all:
+      - field: name
+        regex: '^(\[)?(kworker|kthreadd|ksoftirqd|kswapd|migration|rcu_(sched|bh|preempt)|watchdogd?|kdevtmpfs|khugepaged|jbd2|kauditd|ksmd|kblockd|irq/)'
+      - {field: exe, exists: true}
+  response: [kill_process, quarantine_file]
+
+- id: PROC-017
+  title: Intento de escape de contenedor
+  severity: high
+  tactic: privilege-escalation
+  mitre: [T1611]
+  category: process
+  action: start
+  condition:
+    field: cmdline
+    regex:
+      - 'nsenter\s+.*(-t|--target)\s+1\b'
+      - 'docker\s+run\s+.*--privileged.*-v\s+/:/'
+      - 'docker\s+run\s+.*-v\s+/:/\S+.*chroot'
+      - '--pid=host.*--privileged'
+      - 'release_agent'
+      - 'mount\s+/dev/[sv]d[a-z][0-9]*\s+/'
+
+- id: PROC-018
+  title: Acceso a claves privadas o credenciales en ficheros
+  severity: medium
+  tactic: credential-access
+  mitre: [T1552.001, T1552.004]
+  category: process
+  action: start
+  condition:
+    all:
+      - field: name
+        in: [cat, cp, scp, tar, zip, curl, wget, nc, base64, xxd, rsync, python, python3, less, more]
+      - field: cmdline
+        regex: ['\.ssh/id_(rsa|dsa|ecdsa|ed25519)(\s|$)', '\.aws/credentials', '\.kube/config', '\.docker/config\.json', '\.git-credentials', '\.netrc', '\.pgpass', 'wallet\.dat', '/\.gnupg/']
+
+- id: PROC-019
+  title: Fichero marcado como inmutable (chattr +i)
+  description: Técnica usada por mineros y backdoors para impedir su eliminación
+  severity: medium
+  tactic: defense-evasion
+  mitre: [T1222.002]
+  category: process
+  action: start
+  condition:
+    field: cmdline
+    regex: '\bchattr\s+[+-]?[a-z]*i[a-z]*\s'
+
+- id: PROC-020
+  title: Software de acceso remoto ejecutado
+  severity: medium
+  tactic: command-and-control
+  mitre: [T1219]
+  category: process
+  action: start
+  condition:
+    field: name
+    in: [anydesk, AnyDesk.exe, teamviewer, TeamViewer.exe, rustdesk, tmate, screenconnect, ScreenConnect.ClientService.exe, atera, splashtop, meshagent]
+
+- id: PROC-021
+  title: Preparación de datos para exfiltración
+  severity: medium
+  tactic: exfiltration
+  mitre: [T1560, T1567]
+  category: process
+  action: start
+  condition:
+    field: cmdline
+    regex:
+      - '\b(tar|zip|7z|rar)\b.*\s(/home|/etc|/root|/var/lib/mysql|/var/www)\b.*\s/(tmp|dev/shm|var/tmp)/'
+      - 'curl\s+.*(-T|--upload-file|-F\s+\S*=@)\s'
+      - '\b(rclone|megacmd|mega-put)\b'
+      - 'transfer\.sh|file\.io|anonfiles|gofile\.io|0x0\.st|temp\.sh'
+
+- id: PROC-022
+  title: Carga de módulo del kernel desde ruta no estándar
+  severity: high
+  tactic: persistence
+  mitre: [T1547.006, T1014]
+  category: process
+  action: start
+  condition:
+    all:
+      - {field: name, in: [insmod, modprobe, kmod]}
+      - {field: cmdline, regex: '(/tmp/|/dev/shm/|/var/tmp/|/home/)\S*\.ko'}
+
+- id: PROC-023
+  title: Inhibición de recuperación del sistema (precursor de ransomware)
+  severity: critical
+  tactic: impact
+  mitre: [T1490]
+  category: process
+  action: start
+  condition:
+    field: cmdline
+    regex:
+      - 'vssadmin(\.exe)?\s+delete\s+shadows'
+      - 'wmic(\.exe)?\s+shadowcopy\s+delete'
+      - 'wbadmin(\.exe)?\s+delete\s+(catalog|systemstatebackup)'
+      - 'bcdedit(\.exe)?\s+.*recoveryenabled\s+no'
+      - 'bcdedit(\.exe)?\s+.*bootstatuspolicy\s+ignoreallfailures'
+  response: [kill_process, isolate_host]
+
+- id: PROC-024
+  title: LOLBin de Windows usado para descarga/ejecución
+  severity: high
+  tactic: defense-evasion
+  mitre: [T1105, T1218]
+  category: process
+  action: start
+  condition:
+    field: cmdline
+    regex:
+      - 'certutil(\.exe)?\s+.*-urlcache.*http'
+      - 'mshta(\.exe)?\s+.*(http|javascript|vbscript)'
+      - 'rundll32(\.exe)?\s+.*javascript:'
+      - 'regsvr32(\.exe)?\s+.*/i:http'
+      - 'bitsadmin(\.exe)?\s+/transfer'
+  response: [kill_process]
+
+- id: PROC-025
+  title: Doble extensión engañosa en ejecutable
+  severity: high
+  tactic: defense-evasion
+  mitre: [T1036]
+  category: process
+  action: start
+  condition:
+    field: name
+    regex: '\.(pdf|docx?|xlsx?|jpg|png|txt|zip)\.(exe|scr|bat|cmd|js|vbs|com|pif|sh|elf)$'
+  response: [kill_process, quarantine_file]
+
+- id: PROC-026
+  title: Shell interactiva lanzada con privilegios desde sudo/su
+  severity: low
+  tactic: privilege-escalation
+  mitre: [T1548.003]
+  category: process
+  action: start
+  skip_initial: true
+  condition:
+    all:
+      - {field: username, equals: root}
+      - {field: name, in: [bash, sh, zsh, dash]}
+      - {field: parent.name, in: [sudo, su, pkexec, doas]}
+
+- id: PROC-027
+  title: Explotación de pkexec / escalada conocida
+  severity: critical
+  tactic: privilege-escalation
+  mitre: [T1068]
+  category: process
+  action: start
+  condition:
+    any:
+      - {field: cmdline, regex: ['(pwnkit|cve-2021-4034|dirtypipe|dirty_?cow|cve-2022-0847|cve-2023-0386|cve-2021-3156|looney|gameoverlay)']}
+      - all:   # PwnKit: pkexec lanzado con argv vacío
+          - {field: name, equals: pkexec}
+          - {field: args, length_gt: -1}
+          - {field: cmdline, regex: '^\s*$'}
+  response: [kill_process]

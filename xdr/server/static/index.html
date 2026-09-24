@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SentinelXDR Console</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 2 4 7v8c0 7.5 5.1 13.4 12 15 6.9-1.6 12-7.5 12-15V7z' fill='%232a78d6'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div id="login" class="login hidden">
+  <form id="login-form" class="login-card">
+    <div class="brand big"><span class="shield"></span>SentinelXDR</div>
+    <p class="muted">Introduce el token de administrador (config <code>server.admin_token</code>).</p>
+    <input id="token" type="password" placeholder="Token de administrador" autocomplete="current-password" required>
+    <button type="submit" class="btn primary">Entrar</button>
+    <p id="login-error" class="error"></p>
+  </form>
+</div>
+<div id="app" class="app hidden">
+  <aside class="sidebar">
+    <div class="brand"><span class="shield"></span>SentinelXDR</div>
+    <nav id="nav">
+      <a data-view="overview" class="active">Resumen</a>
+      <a data-view="incidents">Incidentes</a>
+      <a data-view="alerts">Alertas</a>
+      <a data-view="hunt">Threat hunting</a>
+      <a data-view="endpoints">Endpoints</a>
+      <a data-view="posture">Postura</a>
+      <a data-view="mitre">MITRE ATT&amp;CK</a>
+      <a data-view="intel">Inteligencia</a>
+      <a data-view="response">Respuesta</a>
+      <a data-view="rules">Reglas</a>
+    </nav>
+    <div class="sidebar-foot">
+      <button id="theme-toggle" class="btn ghost small" type="button">Tema</button>
+      <button id="logout" class="btn ghost small" type="button">Salir</button>
+    </div>
+  </aside>
+  <main>
+    <header class="topbar">
+      <h1 id="view-title">Resumen</h1>
+      <div class="topbar-right">
+        <span id="live" class="live">● en vivo</span>
+        <select id="range" aria-label="Rango temporal">
+          <option value="1">Última hora</option>
+          <option value="24" selected>Últimas 24 h</option>
+          <option value="168">Últimos 7 días</option>
+          <option value="720">Últimos 30 días</option>
+        </select>
+      </div>
+    </header>
+    <section id="view" class="view"></section>
+  </main>
+</div>
+<div id="drawer" class="drawer hidden" role="dialog" aria-modal="true">
+  <div class="drawer-panel">
+    <button id="drawer-close" class="btn ghost small close" type="button">Cerrar ✕</button>
+    <div id="drawer-body"></div>
+  </div>
+</div>
+<div id="tooltip" class="tooltip hidden"></div>
+<div id="toast" class="toast hidden"></div>
+<script src="/app.js"></script>
+</body>
+</html>
